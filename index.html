@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contrastive Decoding Is Classifier-Free Guidance</title>
+  <meta name="description" content="Every visual contrastive decoder is classifier-free guidance with its own negative stream. VLM-CFG schedules which prefix the image-free reference reads, adding 5.7 points to Qwen2.5-VL-7B at 1.04x the cost of unguided decoding.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://eslambakr.github.io/VLM_CFG_project_page/">
+  <meta property="og:title" content="Contrastive Decoding Is Classifier-Free Guidance: Unifying Visual Guidance for Vision-Language Models">
+  <meta property="og:description" content="Every visual contrastive decoder is classifier-free guidance with its own negative stream. VLM-CFG schedules which prefix the image-free reference reads, adding 5.7 points to Qwen2.5-VL-7B at 1.04x the cost of unguided decoding.">
+  <meta property="og:image" content="https://eslambakr.github.io/VLM_CFG_project_page/static/images/teaser.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="static/images/favicon.svg" type="image/svg+xml">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+
+<div class="progress" aria-hidden="true"><div class="progress-bar" id="progress-bar"></div></div>
+
+<!-- ============================== HERO ============================== -->
+<header class="hero" id="top">
+  <div class="hero-inner">
+    <h1 class="title">Contrastive Decoding Is Classifier-Free Guidance</h1>
+    <p class="subtitle">Unifying Visual Guidance for Vision-Language Models</p>
+
+    <!-- One list per printed line, as in the paper. -->
+    <ul class="authors">
+      <li>Eslam Abdelrahman<sup>1</sup></li>
+      <li>Hamza Omar Alkaf<sup>1</sup></li>
+      <li>Paul Guerrero<sup>2</sup></li>
+      <li>Duygu Ceylan<sup>2</sup></li>
+    </ul>
+    <ul class="authors">
+      <li>Yuheng Li<sup>2</sup></li>
+      <li>Siddharth Srinivasan Iyer<sup>2</sup></li>
+      <li>Nanxuan Zhao<sup>2</sup></li>
+      <li>Eli Shechtman<sup>2</sup></li>
+    </ul>
+    <ul class="authors">
+      <li>Krishna Kumar Singh<sup>2</sup></li>
+      <li>Mohamed Elhoseiny<sup>1</sup></li>
+    </ul>
+    <ul class="affiliations">
+      <li><sup>1</sup>King Abdullah University of Science and Technology (KAUST)</li>
+      <li><sup>2</sup>Adobe Research</li>
+    </ul>
+
+    <!-- When a link is ready: set href, and remove class "is-pending" and the <span class="soon">. -->
+    <div class="links">
+      <a class="btn is-pending" href="#" aria-disabled="true" title="Coming soon">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h9l5 5v15H6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 2v6h6M9 13h8M9 17h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Paper <span class="soon">soon</span>
+      </a>
+      <a class="btn is-pending" href="#" aria-disabled="true" title="Coming soon">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" fill="currentColor"/></svg>
+        Code <span class="soon">soon</span>
+      </a>
+      <a class="btn" href="#bibtex">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10a1 1 0 0 1 1 1v16l-6-4-6 4V5a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        BibTeX
+      </a>
+    </div>
+
+    <figure class="teaser">
+      <div class="teaser-row">
+        <img class="zoomable panel-a" src="static/images/teaser_a.png" width="1470" height="900"
+             alt="Guidance amplifies image evidence. Asked what the cat is sitting on, the model with the image gives Chair 35.2% and Mirror 31.7%; without the image, Chair 15.6% and Mirror under 0.1%; guided, Chair 1.6% and Mirror 96.9%.">
+        <span class="seam" aria-hidden="true"></span>
+        <img class="zoomable panel-b" src="static/images/teaser_b.png" width="960" height="900"
+             alt="Guidance on the decision token per generated token, log scale. Reading only the question (i-1) stays near 20 nats; reading the answer so far (TF) drops to about 1.5 after one token; switch follows i-1 up to K = 8 and TF after it.">
+        <span class="seam" aria-hidden="true"></span>
+        <img class="zoomable panel-c" src="static/images/teaser_c.png" width="870" height="900"
+             alt="Average over ten benchmarks against decoding cost on Qwen2.5-VL-7B: ours 59.6 at 1.04x, 5.7 above unguided; PAI, SID and VCD near 2x cost; M3ID below unguided.">
+      </div>
+      <figcaption>
+        <strong>Contrastive decoding is classifier-free guidance, and autoregression adds an axis diffusion never
+        had.</strong> (a)&nbsp;The model reads the question with the image (<span class="c">c</span>) and without it
+        (<span class="u">u</span>), and guidance extrapolates away from <span class="u">u</span>, pushing each token by how
+        much the image raises its probability: Chair, the answer the model gives without looking, falls, and Mirror,
+        which only the image supports, wins. Every contrastive decoder is this equation with its own
+        <span class="u">u</span>. (b)&nbsp;<span class="u">u</span> must read some prefix of the answer. Teacher forcing
+        (<span class="rule tf">tf</span>), the field's silent choice, feeds it the answer so far, which leaks the image and
+        collapses guidance after one token; reading only the question (<span class="rule i1">i-1</span>) never fades.
+        <span class="rule sw">switch</span> uses <span class="rule i1">i-1</span> for the first
+        <span class="math">\(K\)</span> tokens and <span class="rule tf">tf</span> for the rest.
+        <span class="math">\(\Delta^\star\)</span>: guidance on the decision token, OCRBench v2. (c)&nbsp;On ten general
+        benchmarks, <span class="ours">VLM-CFG</span> adds 5.7 points to Qwen2.5-VL-7B and beats the strongest published
+        contrastive decoder, PAI, by over two points, at 1.04&times; the cost of unguided decoding against about
+        2&times; for PAI, SID and VCD.
+      </figcaption>
+    </figure>
+  </div>
+</header>
+
+<!-- ============================== LAYOUT ============================== -->
+<div class="layout">
+
+  <nav class="toc" id="toc" aria-label="Table of contents">
+    <div class="toc-inner">
+      <a class="toc-brand" href="#top">VLM-CFG</a>
+      <ol>
+        <li><a href="#abstract">Abstract</a></li>
+        <li><a href="#identity">Contrastive Decoding Is CFG</a>
+          <ol>
+            <li><a href="#identity-equation">One equation</a></li>
+            <li><a href="#identity-classifier">An implicit image classifier</a></li>
+            <li><a href="#identity-operator">One operator, many references</a></li>
+          </ol>
+        </li>
+        <li><a href="#overview">What Survives Autoregression</a></li>
+        <li><a href="#reference">Where the Reference Stands</a>
+          <ol>
+            <li><a href="#reference-rules">Two rules, opposite failures</a></li>
+            <li><a href="#reference-switch">Switching inside one answer</a></li>
+            <li><a href="#reference-evidence">Each rule wins in its regime</a></li>
+          </ol>
+        </li>
+        <li><a href="#negative">The Negative Stream</a>
+          <ol>
+            <li><a href="#negative-input">Degrading the input</a></li>
+            <li><a href="#negative-model">Degrading the model</a></li>
+          </ol>
+        </li>
+        <li><a href="#geometry">The Geometry of the Update</a>
+          <ol>
+            <li><a href="#geometry-lemma">Every operator is a scale</a></li>
+            <li><a href="#geometry-results">Against the scale ladder</a></li>
+          </ol>
+        </li>
+        <li><a href="#results">Results</a>
+          <ol>
+            <li><a href="#results-config">One fixed configuration</a></li>
+            <li><a href="#results-main">Main results</a></li>
+            <li><a href="#results-reasoning">Guidance versus reasoning</a></li>
+            <li><a href="#results-cost">Decoding cost</a></li>
+          </ol>
+        </li>
+        <li><a href="#limitations">Limitations</a></li>
+        <li><a href="#bibtex">BibTeX</a></li>
+      </ol>
+    </div>
+  </nav>
+
+  <main class="content">
+
+    <!-- ============================== ABSTRACT ============================== -->
+    <section class="band" id="abstract">
+      <div class="wrap">
+        <h2>Abstract</h2>
+        <p class="abstract">
+          Classifier-free guidance runs a model with and without its condition and pushes the prediction away from the
+          unconditional one. It is standard in image and video generation, where even the largest models rely on it, yet
+          recent vision-language models (VLMs) do not use it when decoding. The closest existing approach is visual
+          contrastive decoding, a large family of methods that contrast the model's prediction with a weakened stream
+          built from a noised image, a distorted prompt or no image at all. We show that each such method is
+          classifier-free guidance with its own negative stream, yet each was proposed in isolation and evaluated almost
+          exclusively on hallucination benchmarks. Unifying them turns them into one design space and lets us import the
+          mature guidance literature of diffusion, from autoguidance to adaptive projected guidance. Most of these
+          methods, however, do not survive autoregressive decoding, where each guided step is read once and an early
+          mistake cannot be corrected. One key finding is that no negative stream we build beats simply deleting the
+          image, and that under greedy decoding the update rules of diffusion provably reduce to a change of guidance
+          scale. One idea does carry over, scheduling guidance along the trajectory, and autoregression gives it a new
+          target. The stream without the image must read some part of the answer, a choice that diffusion never faces
+          and that existing methods leave implicit. Scheduling this reference, the autoregressive counterpart of the
+          guidance schedules of diffusion, keeps guidance strong while the answer is being decided and lets it fade as
+          the answer unfolds. Without training or per benchmark tuning, the resulting decoder adds 5.7 points to
+          <span class="nowrap">Qwen2.5-VL-7B</span> and 1.7 to <span class="nowrap">Qwen3-VL-8B</span> on ten general
+          benchmarks and outperforms four published contrastive decoders, at 1.04&times; the cost of unguided decoding
+          against about 2&times; for the strongest of them.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================== IDENTITY ============================== -->
+    <section class="band" id="identity">
+      <div class="wrap">
+        <h2>Contrastive Decoding Is Classifier-Free Guidance</h2>
+        <p>
+          Classifier-free guidance is how generative models are sampled: the model runs twice at every step, once with
+          the prompt and once without, and extrapolates away from the second. Every large text-to-image and video system
+          ships with it; unified models make the asymmetry plain, guiding when they draw an image and not when they answer
+          a question. Visual contrastive decoding subtracts the model's prediction on a noised image, and dozens of
+          methods since differ in what the second stream sees.
+        </p>
+        <blockquote class="hypothesis">
+          Contrastive decoding is not a relative of classifier-free guidance. It <em>is</em> classifier-free guidance,
+          with a particular reference.
+        </blockquote>
+
+        <h3 class="sub" id="identity-equation">One equation</h3>
+        <p>
+          With <span class="math">\(v\)</span> the image, <span class="math">\(h = (q, y_{&lt;t})\)</span> the question
+          and the answer so far, <span class="math">\(\ell_c = \log p(\cdot \mid v, h)\)</span> the
+          <span class="c">conditional stream</span>, and <span class="math">\(\ell_u\)</span> the same prompt with the image
+          removed, the <span class="u">image-free stream</span>, guidance is
+        </p>
+        <div class="eq">\[
+          \tilde\ell \;=\; \textcolor{#b8481a}{\ell_u} + \alpha\,(\textcolor{#1f63b8}{\ell_c} - \textcolor{#b8481a}{\ell_u})
+          \;=\; \textcolor{#1f63b8}{\ell_c} + (\alpha - 1)\,(\textcolor{#1f63b8}{\ell_c} - \textcolor{#b8481a}{\ell_u}),
+          \qquad \tilde p = \operatorname{softmax}(\tilde\ell),
+          \tag{1}
+        \]</div>
+        <p>and <span class="math">\(\alpha = 1\)</span> is plain decoding.</p>
+
+        <h3 class="sub" id="identity-classifier">An implicit image classifier</h3>
+        <p>
+          Classifier guidance needs a separately trained classifier; Ho and Salimans observe that Bayes' rule already
+          contains one, so a single model run with and without its condition plays both roles. A vision-language model is
+          exactly such a model. Were the image-free pass the true marginal
+          <span class="math">\(\bar p(y \mid h) = \mathbb{E}_{v \sim p(v \mid h)}\, p(y \mid v, h)\)</span>, Bayes' rule would
+          turn the bracket into the pointwise mutual information between the candidate token and the image:
+        </p>
+        <div class="eq">\[
+          \log p(y \mid v, h) - \log \bar p(y \mid h)
+          \;=\; \log p(v \mid y, h) - \log p(v \mid h)
+          \;=\; \operatorname{pmi}(y; v \mid h).
+          \tag{2}
+        \]</div>
+        <p>
+          The implicit classifier of classifier-free guidance becomes an implicit <em>image</em> classifier.
+          <strong>Classifier-free guidance for a vision-language model pushes each token by how much evidence it carries
+          about the image.</strong>
+        </p>
+
+        <h3 class="sub" id="identity-operator">One operator, many references</h3>
+        <p>
+          The operator is the geometric tilt <span class="math">\(\tilde p \propto p_c^{\alpha}\, p_u^{1-\alpha}\)</span>. On
+          two Gaussians with a shared variance, a diffusion reverse step, it returns the classifier-free guidance update;
+          on two categorical distributions, a vision-language model's next token, it returns Eq.&nbsp;(1). The two are not
+          analogous; they are one operator applied to two families. No published reference is the marginal
+          <span class="math">\(\bar p\)</span>, and writing <span class="math">\(q(y)\)</span> for whatever a method
+          subtracts, the bracket splits exactly as
+        </p>
+        <div class="eq">\[
+          \ell_c(y) - \log q(y) \;=\; \underbrace{\operatorname{pmi}(y; v \mid h)}_{\text{image evidence}}
+          \;+\; \underbrace{\log \bar p(y \mid h) / q(y)}_{\text{reference bias } b_q(y)},
+          \tag{3}
+        \]</div>
+        <p>
+          so every contrastive decoder applies the same tilt and differs <em>only</em> in the bias
+          <span class="math">\(b_q\)</span>. The question worth asking is which reference.
+        </p>
+
+        <div class="cards three">
+          <div class="card">
+            <div class="card-kicker">Import</div>
+            <h3>Diffusion's toolkit becomes available</h3>
+            <p>Naming these methods as guidance lets us import what diffusion has matured: what the negative stream
+              sees, how to reshape the update, and how to schedule its strength along the trajectory.</p>
+          </div>
+          <div class="card">
+            <div class="card-kicker">Audit</div>
+            <h3>The methods meet on common ground</h3>
+            <p>Contrastive decoding fixes one point per paper and tests it on hallucination benchmarks with backbones two
+              generations old. On common ground, PAI's attention edit adds nothing a larger guidance scale does not
+              already provide.</p>
+          </div>
+          <div class="card">
+            <div class="card-kicker">The catch</div>
+            <h3>Autoregression reads every step once</h3>
+            <p>A diffusion sampler corrects small errors over many steps. An autoregressive model reads its guided vector
+              once, into an argmax, and a wrong first word cannot be undone.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== OVERVIEW ============================== -->
+    <section class="band" id="overview">
+      <div class="wrap">
+        <h2>What Survives Autoregressive Decoding</h2>
+        <p class="lead">
+          Diffusion treats guidance as a design space: what the negative stream sees, how to reshape the update, and
+          how strongly and for how long to apply it. We take that toolkit whole and ask what survives autoregressive
+          decoding, on Qwen2.5-VL-7B and benchmarks whose answers run from two tokens to several hundred. Most of it does
+          not: every negative stream points towards deleting the image, and every operator reduces to a change of
+          guidance scale. One axis has no diffusion counterpart, and it is where the gain is.
+        </p>
+
+        <div class="findings">
+          <div class="finding">
+            <div class="finding-tag">Finding 1</div>
+            <h3>Where the reference stands decides the outcome</h3>
+            <p>The teacher-forced reference leaks the answer and collapses after one token; the cached one never fades
+              and overguides long answers. Switching between them takes the better of both, and single-token benchmarks
+              cannot see the difference.</p>
+            <a class="finding-link" href="#reference">The reference axis &darr;</a>
+          </div>
+          <div class="finding">
+            <div class="finding-tag">Finding 2</div>
+            <h3>No negative stream beats deleting the image</h3>
+            <p>Every negative stream we built, from the pixels, from a weaker model or from degraded attention, either
+              points towards image deletion or fails. Weakened attention reaches parity with deletion, and combining the
+              two only rescales the guidance.</p>
+            <a class="finding-link" href="#negative">The negative stream &darr;</a>
+          </div>
+          <div class="finding">
+            <div class="finding-tag">Finding 3</div>
+            <h3>Every imported operator is a guidance scale</h3>
+            <p>Every guidance operator imported from diffusion lands on the scale ladder, and none beats the best
+              constant scale on any benchmark. The two that move the scale appreciably are a halving of it (TCFG) and
+              guidance on the first token until the reference refreshes (CFG-Zero<sup>*</sup>).</p>
+            <a class="finding-link" href="#geometry">The update geometry &darr;</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== REFERENCE ============================== -->
+    <section class="band" id="reference">
+      <div class="wrap">
+        <h2>Where the Reference Stands</h2>
+        <p>
+          The image-free stream sees the question and the answer so far, but not the image, so it predicts what the
+          model would say without looking: the language prior. Subtracting it in Eq.&nbsp;(1) leaves each token with the
+          evidence it carries about the image. In diffusion both branches see the same noisy sample. In an autoregressive
+          VLM the image-free stream can be conditioned on <em>any</em> prefix of the answer, and the equation does not
+          say which.
+        </p>
+        <figure class="wide">
+          <img class="zoomable" src="static/images/reference_rules.png" width="3200" height="674"
+               alt="Three reference rules. (a) i-1: the image-free stream reads only the question, computed once. (b) TF: it reruns on the conditional's full prefix every step. (c) Switching: i-1 for the first K tokens, then a catch-up pass and TF.">
+          <figcaption>
+            <strong>Three rules for the image-free reference.</strong> (a)&nbsp;<span class="rule i1">i-1</span> reads the
+            question alone and is computed once. (b)&nbsp;<span class="rule tf">tf</span> reruns the reference on the
+            conditional's full prefix at every step. (c)&nbsp;<span class="rule sw">switch</span> runs
+            <span class="rule i1">i-1</span> for the first <span class="math">\(K\)</span> tokens, then catches the
+            reference up and continues with <span class="rule tf">tf</span>.
+          </figcaption>
+        </figure>
+
+        <h3 class="sub" id="reference-rules">Two rules, opposite failures</h3>
+        <p>
+          At the first step the prefix is empty, so both rules coincide on single-token answers. Beyond it, they fail in
+          opposite regimes.
+        </p>
+        <div class="cards two">
+          <div class="card is-tf">
+            <div class="card-kicker">Teacher forcing</div>
+            <h3>Follows the answer, and leaks it</h3>
+            <p>The field's silent choice, and the rule of visual contrastive decoding: the image-free stream reads the
+              tokens the guided model has just produced. That is text written about the image, handed to the stream
+              meant to be blind to it. One generated token costs about two thirds of the guidance signal, and what remains
+              sits below its own noise floor.</p>
+          </div>
+          <div class="card is-i1">
+            <div class="card-kicker">Prefix-free</div>
+            <h3>Reads the question once, and goes stale</h3>
+            <p>The image-free stream runs once, when the model has read the whole input and none of the answer, and its
+              prediction is reused throughout: <span class="math">\(N\)</span> tokens take
+              <span class="math">\(N + 1\)</span> passes, against <span class="math">\(2N\)</span> for
+              <span class="rule tf">tf</span>. Its push never fades.
+              On a short answer that helps; on a long one every correction is reapplied at every later step, and the
+              answer drifts.</p>
+          </div>
+        </div>
+
+        <h3 class="sub" id="reference-switch">Switching the reference inside one answer</h3>
+        <p>
+          Diffusion meets the same tension along its trajectory and resolves it by scheduling the guidance strength over
+          time. The reference gives an autoregressive model a schedule of its own. <span class="rule tf">tf</span>'s leak
+          is not only a defect: because the reference has read the prefix, its remaining push measures how much the
+          image still matters at <em>this</em> token. Once the text has fixed the answer, the reference agrees and
+          guidance vanishes. <span class="rule sw">switch</span> uses each rule where it is right.
+        </p>
+        <div class="stages">
+          <div class="stage is-i1">
+            <div class="stage-num">First K tokens</div>
+            <h3>Prefix-free reference</h3>
+            <p>Full strength while the answer is being decided. On answers shorter than
+              <span class="math">\(K\)</span> the switch never fires, and guidance costs one extra pass.</p>
+          </div>
+          <div class="stage-arrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>catch up</span>
+          </div>
+          <div class="stage is-tf">
+            <div class="stage-num">Then</div>
+            <h3>Teacher-forced reference</h3>
+            <p>The reference catches up on the prefix in one pass, after which guidance fades token by token as the
+              answer unfolds.</p>
+          </div>
+        </div>
+        <p class="note">The switch point <span class="math">\(K\)</span> is the only hyperparameter. We set
+          <span class="math">\(K = 8\)</span> from answer-length statistics before reading any score; any
+          <span class="math">\(K\)</span> from 4 to 32 ties <span class="rule tf">tf</span> on MathVerse.</p>
+
+        <h3 class="sub" id="reference-evidence">Each rule wins in its own regime</h3>
+        <p>
+          We expect <span class="rule i1">i-1</span> to win on short answers and <span class="rule tf">tf</span> on long
+          ones, and on Qwen2.5-VL-7B the benchmarks confirm both, with one exception the mechanism predicts. OCRBench v2
+          has long answers, yet <span class="rule tf">tf</span> costs 0.73 points there while
+          <span class="rule i1">i-1</span> is flat: reading text keeps every token dependent on the image, so the cached
+          push lands on tokens the model already ranks first and changes nothing.
+        </p>
+        <figure class="wide mid">
+          <img class="zoomable" src="static/images/reference_analysis.png" width="1880" height="1041"
+               alt="(a) Guidance on the decision token per generated token, log scale: TF drops from about 4.5 to 1.5 nats after one token; i-1 rises to about 20 and stays; SWITCH follows i-1 to token 8 and TF after. (b) Gain over no guidance by benchmark, ordered by answer length: i-1 falls to about -4 on MathVerse while TF and SWITCH stay positive.">
+          <figcaption>(a)&nbsp;The guidance term <span class="math">\(\Delta^\star\)</span> on the decision token, per
+            generated token (OCRBench v2). (b)&nbsp;Gain over unguided decoding, by answer length.</figcaption>
+        </figure>
+        <div class="table-wrap">
+          <table class="results">
+            <caption>Where the reference stands, on Qwen2.5-VL-7B, with benchmarks ordered by mean answer length.
+              <em>+oracle</em>: the <span class="rule i1">i-1</span> push rescaled to <span class="rule tf">tf</span>'s
+              per-token strength. <em>+decay</em>: rescaled by <span class="rule tf">tf</span>'s average decay.
+              <em>Overall</em>: mean over the seven benchmarks.</caption>
+            <thead>
+              <tr>
+                <th class="left">Reference</th>
+                <th>OK-VQA</th><th>VizWiz</th><th>O3</th><th>PhD-rat.</th><th>ReasonSeg</th><th>OCRBench</th><th>MathVerse</th><th class="sep">Overall</th>
+              </tr>
+              <tr class="len">
+                <td class="left"># tokens</td><td>2.4</td><td>2.5</td><td>3.8</td><td>30.2</td><td>60.9</td><td>152.1</td><td>337.7</td><td class="sep"></td>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="base-row"><td class="left">no guidance</td><td>42.60</td><td>73.80</td><td>57.34</td><td>68.73</td><td>49.45</td><td>53.69</td><td>60.28</td><td class="sep">57.98</td></tr>
+              <tr><td class="left"><span class="rule tf">tf</span></td><td>52.76</td><td>76.01</td><td>58.68</td><td>71.98</td><td>52.01</td><td>52.96</td><td>62.82</td><td class="sep">61.03</td></tr>
+              <tr><td class="left"><span class="rule i1">i-1</span></td><td>54.00</td><td>78.06</td><td>63.61</td><td>69.99</td><td>50.18</td><td>53.83</td><td>56.01</td><td class="sep">60.81</td></tr>
+              <tr><td class="left"><span class="rule i1">i-1</span> +oracle</td><td>54.60</td><td>78.46</td><td>56.91</td><td>68.33</td><td>51.29</td><td>52.41</td><td>61.55</td><td class="sep">60.51</td></tr>
+              <tr><td class="left"><span class="rule i1">i-1</span> +decay</td><td>54.64</td><td>78.49</td><td>58.96</td><td>69.72</td><td>50.91</td><td>53.83</td><td>58.83</td><td class="sep">60.77</td></tr>
+              <tr class="ours-row"><td class="left"><span class="rule sw">switch</span> (ours)</td><td>54.00</td><td>78.06</td><td>63.61</td><td>72.78</td><td>51.86</td><td>53.77</td><td>62.54</td><td class="sep">62.37</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callouts">
+          <p><strong>Short answers favour <span class="rule i1">i-1</span>.</strong> On every benchmark whose answer is
+            shorter than five tokens, <span class="rule i1">i-1</span> beats <span class="rule tf">tf</span>, by up to
+            4.93 points. The strong cached push, and the pressure to stop that it creates, is what helps: on O3,
+            <span class="rule i1">i-1</span> stops after the first label in 90% of answers, which lifts F1 from 58.68
+            to 63.61.</p>
+          <p><strong>Long answers favour <span class="rule tf">tf</span>, and the drop is the leak.</strong> On MathVerse
+            <span class="rule i1">i-1</span> falls 6.81 points below <span class="rule tf">tf</span> and 4.27 below no
+            guidance. With length and step fixed, <span class="math">\(\Delta^\star\)</span> falls from 18.35 nats with no
+            prefix to 15.05 with another document's prefix, 7.55 with this document's tokens shuffled, and 1.48 with its
+            real prefix.</p>
+        </div>
+        <p>
+          <strong>Strength, not direction, is what goes wrong.</strong> The strength oracle keeps the
+          <span class="rule i1">i-1</span> direction but gives it <span class="rule tf">tf</span>'s per-token strength, and
+          recovers <span class="rule tf">tf</span> on long answers (MathVerse 61.55 against 62.82, ReasonSeg 51.29 against
+          52.01, both within noise). A fixed decay curve, which needs no second stream, falls 3.99 points short on
+          MathVerse: the right strength after the first tokens has to be read token by token from the teacher-forced
+          stream. <span class="rule sw">switch</span> does exactly this. It follows the better rule at every answer
+          length and beats both on average, 62.37 against 61.03 for <span class="rule tf">tf</span> and 60.81 for
+          <span class="rule i1">i-1</span>.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================== NEGATIVE STREAM ============================== -->
+    <section class="band" id="negative">
+      <div class="wrap">
+        <h2>The Negative Stream</h2>
+        <p class="lead">
+          Classifier-free guidance drops the condition, which for a vision-language model means deleting the image.
+          Contrastive decoding corrupts the image instead, and autoguidance weakens the model. Neither beats deletion.
+        </p>
+
+        <h3 class="sub" id="negative-input">Degrading the input</h3>
+        <p>
+          We tested a wide range of corruptions: black, resized and blurred images, and noised, masked, grayscale, patch
+          shuffled and colour-inverted ones. All of them produce a guidance vector whose alignment with deletion's is far
+          above chance, and that alignment rises with the strength of the corruption. The constructions form a cone that
+          closes onto deletion, with the noised image of visual contrastive decoding as its weakest point.
+        </p>
+        <figure class="wide">
+          <img class="zoomable" src="static/images/cone.png" width="1876" height="660" loading="lazy"
+               alt="Violin plots on V*, TreeBench and VizWiz of each corruption's alignment with the deletion direction against its strength. Alignment rises with strength, with Pearson r of 0.74, 0.81 and 0.97; chance is 0.013.">
+          <figcaption><strong>Every corruption of the image points towards its deletion.</strong> For eight corruptions of
+            the negative image, the alignment of each document's guidance vector with the deletion direction, against the
+            corruption's strength <span class="math">\(r = \|\Delta\|/\|h_c\|\)</span>. Violins show the distribution over
+            documents; the dashed line fits the medians; chance is 0.013.</figcaption>
+        </figure>
+        <p>
+          The guidance scale cannot turn one construction into another, because it absorbs the <em>length</em> of a
+          construction's vector but never its <em>angle</em>. Matching deletion's step gives
+        </p>
+        <div class="eq">\[
+          \alpha^{\star} - 1 = (\alpha_0 - 1)\,\cos\theta\,\frac{\|\Delta_{\text{drop}}\|}{\|\Delta_p\|},
+        \]</div>
+        <p>
+          with a residual proportional to <span class="math">\(\sin\theta\)</span>. Deletion is the only construction with
+          nothing to tune, and the cheapest, since its negative pass carries no image tokens.
+        </p>
+
+        <h3 class="sub" id="negative-model">Degrading the model</h3>
+        <p>
+          Autoguidance proposes a different negative: a weaker copy of the same model, which reproduces the conditional's
+          errors more strongly and so isolates the direction worth following. Diffusion can accumulate a small difference
+          over many denoising steps; here, each step is read once.
+        </p>
+        <figure class="wide">
+          <img class="zoomable" src="static/images/autoguidance.png" width="2800" height="893" loading="lazy"
+               alt="Three weaker negatives: (a) a smaller 3B model, (b) an early exit after K layers, (c) the same model with its attention to the image blurred or peaked.">
+          <figcaption><strong>Three ways to degrade the model instead of the input.</strong> (a)&nbsp;A smaller model,
+            (b)&nbsp;an early exit, and (c)&nbsp;the same model with its attention to the image edited. Each produces the
+            negative stream <span class="u">u</span>.</figcaption>
+        </figure>
+        <div class="table-wrap narrow">
+          <table class="results">
+            <caption>Autoguidance negatives on Qwen2.5-VL-7B at <span class="math">\(\alpha = 1.5\)</span>. MUL, SEG,
+              Over-blur and Masked push the attention towards uniform; Soft PAG and PAG push it towards a single
+              patch.</caption>
+            <thead><tr><th class="left">Negative stream</th><th>VizWiz</th><th>BLINK IQ</th><th>MME-RW</th></tr></thead>
+            <tbody>
+              <tr class="base-row"><td class="left">Unguided</td><td>73.80</td><td>24.67</td><td>41.38</td></tr>
+              <tr class="ours-row"><td class="left">Image deletion (<span class="rule sw">switch</span>)</td><td>78.06</td><td>28.67</td><td>45.86</td></tr>
+            </tbody>
+            <tbody>
+              <tr><td class="left">Early exit, layer 15</td><td>73.57</td><td>24.67</td><td>39.81</td></tr>
+              <tr><td class="left">Smaller, 3B</td><td>69.79</td><td>24.00</td><td>41.01</td></tr>
+            </tbody>
+            <tbody>
+              <tr><td class="left">MUL, <span class="math">\(\gamma = -0.5\)</span></td><td>75.54</td><td>27.33</td><td>45.81</td></tr>
+              <tr><td class="left">SEG</td><td>75.22</td><td>27.33</td><td>47.47</td></tr>
+              <tr><td class="left">Soft PAG, <span class="math">\(\lambda = 0.25\)</span></td><td>76.83</td><td>26.67</td><td>41.12</td></tr>
+              <tr><td class="left">PAG, <span class="math">\(\lambda = 1.0\)</span></td><td>77.16</td><td>28.67</td><td>40.33</td></tr>
+              <tr><td class="left">Over-blur, <span class="math">\(a = -0.5\)</span></td><td>77.16</td><td>26.67</td><td>46.64</td></tr>
+              <tr><td class="left">Masked (<span class="math">\(-\infty\)</span>)</td><td>77.76</td><td>26.67</td><td>43.51</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callouts">
+          <p><strong>A weaker model misses on both sides.</strong> The 3B negative is too close to the model to move an
+            argmax, and VizWiz falls to 69.79. The early exit is too far: its top token never matches the
+            conditional's, on any of the 1,727 documents we checked, so it is a different model rather than a weaker
+            one.</p>
+          <p><strong>Weakened attention reaches parity, not more.</strong> On VizWiz and BLINK every edit improves on
+            unguided decoding, but against a tuned deletion none does better than a tie. Even masking every score leaves the image's marker
+            tokens, positions and cache entries, all of which deletion removes.</p>
+        </div>
+        <p>
+          <strong>The mirage of composition.</strong> Weakened attention and deletion degrade different things, so it is
+          tempting to use both. Choosing the better of the two per document with hindsight gains 1.86 points, but no
+          combination captures it: the best recovers 0.15 points, and of 37 benchmark and combiner pairs, 3 are
+          significant wins and 7 significant losses. Every combination lands on the scale curve of deletion alone. A
+          second negative is a larger guidance scale in disguise.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================== GEOMETRY ============================== -->
+    <section class="band" id="geometry">
+      <div class="wrap">
+        <h2>The Geometry of the Update</h2>
+        <p class="lead">
+          The diffusion literature reshapes the guidance update to repair oversaturated images and samples off the data
+          manifold. We import four widely used operators: APG, CFG-Zero<sup>*</sup>, TCFG and EP-CFG.
+        </p>
+
+        <h3 class="sub" id="geometry-lemma">Every such operator is a guidance scale</h3>
+        <p>
+          Each of them returns a weighted sum of the same two logit vectors,
+          <span class="math">\(\tilde\ell = a\,\ell_c + b\,\ell_u\)</span>, with <span class="math">\(a &gt; 0\)</span>. A
+          greedy decoder takes an argmax, which cannot see a positive rescaling, so
+        </p>
+        <div class="eq">\[
+          \arg\max_y \tilde\ell(y) \;=\; \arg\max_y \big[\ell_c(y) - r\,\ell_u(y)\big],
+          \qquad r = -b/a,
+          \qquad \alpha_{\text{eff}} = \frac{1}{1 - r}.
+          \tag{4}
+        \]</div>
+        <p>
+          The two weights reach the decision only through their ratio, and vanilla guidance produces the same ratio at
+          the scale <span class="math">\(\alpha_{\text{eff}}\)</span>. Composing operators does not escape this: a
+          composition is again a weighted sum of the two streams. We prove it and confirm it on 86,392 decoding steps.
+        </p>
+        <blockquote class="hypothesis">
+          An operator that stays in the span of the two streams is a schedule for the guidance scale.
+        </blockquote>
+        <p>
+          Because <span class="math">\(\alpha_{\text{eff}}\)</span> depends only on the two streams, we can read it off the
+          model and name what each operator actually does:
+        </p>
+        <ul class="points">
+          <li><strong>EP-CFG is the identity.</strong> It scales both weights by one factor, leaves
+            <span class="math">\(r\)</span> unchanged, and in exact arithmetic runs at <span class="math">\(\alpha\)</span>.</li>
+          <li><strong>APG is a relabelled constant.</strong> It shifts the scale by about 0.1 and holds it there.</li>
+          <li><strong>TCFG is a strength rule.</strong> With equal norms it keeps the streams' bisector, giving
+            <span class="math">\(\alpha_{\text{eff}} = (\alpha + 1)/2\)</span> whatever the angle between them; we measure
+            1.251 against the predicted 1.25.</li>
+          <li><strong>CFG-Zero<sup>*</sup> is a duration rule.</strong> Its fitted coefficient is 0.77 to 0.99 at the first
+            token and falls to zero once the answer starts, so it guides the first token and then nothing until the
+            reference refreshes.</li>
+        </ul>
+
+        <h3 class="sub" id="geometry-results">Against the scale ladder</h3>
+        <p>
+          Averaged over five benchmarks, the default scale, TCFG, EP-CFG and APG with
+          <span class="math">\(\eta = 2\)</span> score 64.02, 64.02, 64.00 and 64.18: three published operators and the
+          default, one number. Single cells do move, but no operator is significantly better than the best constant
+          <span class="math">\(\alpha\)</span> on any benchmark.
+        </p>
+        <div class="table-wrap">
+          <table class="results">
+            <caption>Guidance operators against the scale, on Qwen2.5-VL-7B. Benchmarks ordered by answer length, all on
+              <span class="rule sw">switch</span> (<span class="math">\(K = 8\)</span>) at
+              <span class="math">\(\alpha = 1.5\)</span>; <em>Overall</em> is the unweighted mean.</caption>
+            <thead><tr><th class="left">Operator</th><th>VizWiz</th><th>O3</th><th>PhD-rat.</th><th>ReasonSeg</th><th>OCRBench</th><th class="sep">Overall</th></tr></thead>
+            <tbody>
+              <tr class="base-row"><td class="left">unguided, <span class="math">\(\alpha = 1\)</span></td><td>73.80</td><td>57.34</td><td>68.73</td><td>49.45</td><td>53.69</td><td class="sep">60.60</td></tr>
+              <tr class="ours-row"><td class="left"><span class="rule sw">switch</span>, <span class="math">\(\alpha = 1.5\)</span></td><td>78.06</td><td>63.61</td><td>72.78</td><td>51.86</td><td>53.77</td><td class="sep">64.02</td></tr>
+            </tbody>
+            <tbody>
+              <tr><td class="left">APG, <span class="math">\(\eta = 0.5\)</span></td><td>77.59</td><td>63.15</td><td>72.18</td><td>51.65</td><td>54.11</td><td class="sep">63.74</td></tr>
+              <tr><td class="left">APG, <span class="math">\(\eta = 2\)</span></td><td>78.43</td><td>64.13</td><td>72.84</td><td>51.67</td><td>53.82</td><td class="sep">64.18</td></tr>
+              <tr><td class="left">CFG-Zero<sup>*</sup></td><td>78.70</td><td>56.15</td><td>71.05</td><td>51.95</td><td>54.01</td><td class="sep">62.37</td></tr>
+              <tr><td class="left">TCFG</td><td>78.11</td><td>65.61</td><td>71.18</td><td>51.35</td><td>53.87</td><td class="sep">64.02</td></tr>
+              <tr><td class="left">EP-CFG</td><td>78.01</td><td>63.68</td><td>72.18</td><td>51.84</td><td>54.30</td><td class="sep">64.00</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callouts">
+          <p><strong>The nearest miss is a better rung.</strong> On O3, TCFG beats the default scale by 2 points, but the
+            best rung of the ladder, <span class="math">\(\alpha = 1.25\)</span>, by only 0.34, which is not significant.
+            On VizWiz, TCFG's answers match those of <span class="math">\(\alpha = 1.25\)</span> on 96.6% of
+            documents.</p>
+          <p><strong>A duration rule fails where duration matters.</strong> CFG-Zero<sup>*</sup> holds on VizWiz and
+            ReasonSeg, where the answer is decided early. It loses 1.73 points on the 30-token rationales of PhD, and on
+            O3, whose gain lies in the stop decision, it falls 7.46 points, below unguided decoding.</p>
+        </div>
+        <p>
+          The imported toolkit adds no direction. It rediscovers the two knobs the reference already gives us: how strong
+          the push is, and how long it lasts.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================== RESULTS ============================== -->
+    <section class="band" id="results">
+      <div class="wrap">
+        <h2>Results</h2>
+
+        <h3 class="sub" id="results-config">One configuration, fixed in advance</h3>
+        <p>
+          <span class="ours">VLM-CFG</span> is the design the analysis arrives at. It is fixed in advance and never tuned
+          per benchmark or per model:
+        </p>
+        <ul class="points">
+          <li><strong>Negative stream:</strong> delete the image.</li>
+          <li><strong>Blend site:</strong> the last hidden state, which the linear readout makes equivalent to blending
+            the logits.</li>
+          <li><strong>Reference:</strong> <span class="rule sw">switch</span> at <span class="math">\(K = 8\)</span>.</li>
+          <li><strong>Scale:</strong> <span class="math">\(\alpha = 1.5\)</span> throughout.</li>
+        </ul>
+        <p>
+          Every run uses <code>lmms-eval</code> with greedy decoding and each benchmark's default prompt, on five models
+          from three families at 3B to 8B, against four contrastive decoders (VCD, M3ID, PAI and SID) at their published
+          settings.
+        </p>
+
+        <h3 class="sub" id="results-main">Main results</h3>
+        <div class="tabs" role="tablist" aria-label="Choose a model">
+          <button type="button" role="tab" aria-controls="tab-q25-3b" aria-selected="false">Qwen2.5-VL-3B</button>
+          <button type="button" role="tab" aria-controls="tab-q25-7b" aria-selected="true">Qwen2.5-VL-7B</button>
+          <button type="button" role="tab" aria-controls="tab-q3-4b" aria-selected="false">Qwen3-VL-4B</button>
+          <button type="button" role="tab" aria-controls="tab-q3-8b" aria-selected="false">Qwen3-VL-8B</button>
+          <button type="button" role="tab" aria-controls="tab-ivl-8b" aria-selected="false">InternVL3.5-8B</button>
+        </div>
+        <div class="table-wrap">
+          <table class="results">
+            <caption>Accuracy (%) on ten general benchmarks against four contrastive decoders. <em>Overall</em> is the
+              unweighted mean and <em>Cost</em> is decoding time relative to unguided decoding. Bold marks the best value in
+              each column for the selected model.</caption>
+            <thead>
+              <tr>
+                <th class="left">Method</th>
+                <th>OK-VQA</th><th>VizWiz</th><th>O3</th><th>O3-box</th><th>PhD</th><th>MMStar</th><th>TreeBench</th><th>BLINK IQ</th><th>V<sup>*</sup></th><th>MME-RW</th><th>Overall</th><th>Cost</th>
+              </tr>
+            </thead>
+            <tbody id="tab-q25-3b" role="tabpanel" aria-label="Qwen2.5-VL-3B" hidden>
+              <tr class="base-row"><td class="left">Qwen2.5-VL-3B (unguided)</td><td>40.84</td><td>67.75</td><td>62.88</td><td>62.91</td><td>73.09</td><td>56.47</td><td>40.25</td><td>23.33</td><td><b>71.73</b></td><td>38.04</td><td>53.73</td><td>1.00&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ VCD</td><td>43.48</td><td>66.43</td><td>59.25</td><td>60.26</td><td>74.43</td><td>55.26</td><td>36.30</td><td>24.00</td><td>68.59</td><td>39.45</td><td>52.75</td><td>1.96&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ M3ID</td><td>41.28</td><td>67.76</td><td>61.24</td><td>60.51</td><td>73.63</td><td>56.79</td><td><b>40.99</b></td><td>8.00</td><td><b>71.73</b></td><td>36.74</td><td>51.87</td><td>1.08&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ PAI</td><td>46.48</td><td>67.10</td><td><b>64.30</b></td><td>65.34</td><td>74.84</td><td>55.91</td><td>40.49</td><td>24.67</td><td>71.20</td><td>37.88</td><td>54.82</td><td>2.05&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ SID</td><td>47.92</td><td>70.07</td><td>62.49</td><td><b>65.76</b></td><td>76.14</td><td><b>56.96</b></td><td>39.26</td><td>24.00</td><td>71.20</td><td>42.63</td><td>55.64</td><td>2.00&times;</td></tr>
+              <tr class="ours-row"><td class="left">&nbsp;&nbsp;+ VLM-CFG (ours)</td><td><b>51.96</b></td><td><b>72.34</b></td><td>63.10</td><td>65.07</td><td><b>77.12</b></td><td>56.76</td><td>38.27</td><td><b>30.67</b></td><td><b>71.73</b></td><td><b>44.50</b></td><td><b>57.15</b></td><td>1.04&times;</td></tr>
+            </tbody>
+            <tbody id="tab-q25-7b" role="tabpanel" aria-label="Qwen2.5-VL-7B">
+              <tr class="base-row"><td class="left">Qwen2.5-VL-7B (unguided)</td><td>42.36</td><td>73.49</td><td>57.39</td><td>60.24</td><td>67.50</td><td><b>62.43</b></td><td>40.74</td><td>25.33</td><td>70.16</td><td>39.24</td><td>53.89</td><td>1.00&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ VCD</td><td>47.24</td><td>74.37</td><td>55.52</td><td>59.80</td><td>70.90</td><td>61.73</td><td>41.98</td><td>26.67</td><td>70.16</td><td>42.42</td><td>55.08</td><td>1.96&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ M3ID</td><td>42.16</td><td>75.06</td><td>55.61</td><td>57.73</td><td>67.51</td><td>58.01</td><td>37.04</td><td>2.67</td><td>70.68</td><td>46.17</td><td>51.26</td><td>1.08&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ PAI</td><td>50.68</td><td>75.81</td><td><b>65.28</b></td><td><b>67.29</b></td><td>70.49</td><td>62.26</td><td>41.48</td><td>28.00</td><td>70.16</td><td>41.84</td><td>57.33</td><td>2.05&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ SID</td><td>48.24</td><td>73.49</td><td>56.74</td><td>61.74</td><td>73.04</td><td>61.19</td><td>41.73</td><td>26.67</td><td>72.25</td><td>45.49</td><td>56.06</td><td>2.00&times;</td></tr>
+              <tr class="ours-row"><td class="left">&nbsp;&nbsp;+ VLM-CFG (ours)</td><td><b>54.00</b></td><td><b>78.01</b></td><td>63.94</td><td>65.86</td><td><b>79.15</b></td><td>62.17</td><td><b>42.96</b></td><td><b>29.33</b></td><td><b>73.30</b></td><td><b>47.11</b></td><td><b>59.58</b></td><td>1.04&times;</td></tr>
+            </tbody>
+            <tbody id="tab-q3-4b" role="tabpanel" aria-label="Qwen3-VL-4B" hidden>
+              <tr class="base-row"><td class="left">Qwen3-VL-4B (unguided)</td><td>48.32</td><td><b>80.05</b></td><td>51.04</td><td>52.65</td><td>74.47</td><td><b>63.12</b></td><td>43.21</td><td>28.67</td><td>72.25</td><td>45.34</td><td>55.91</td><td>1.00&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ VCD</td><td>47.84</td><td>76.82</td><td>51.48</td><td>53.90</td><td>74.38</td><td>57.96</td><td><b>45.93</b></td><td>31.33</td><td>75.39</td><td>46.59</td><td>56.16</td><td>1.96&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ M3ID</td><td>48.68</td><td><b>80.05</b></td><td>51.04</td><td>52.65</td><td>74.47</td><td>57.44</td><td>43.21</td><td>28.67</td><td>72.77</td><td>45.34</td><td>55.43</td><td>1.08&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ PAI</td><td>48.60</td><td>76.79</td><td>51.06</td><td>54.64</td><td>76.11</td><td>57.45</td><td>43.95</td><td><b>32.00</b></td><td>72.77</td><td>47.00</td><td>56.04</td><td>2.05&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ SID</td><td>48.92</td><td>78.19</td><td><b>53.17</b></td><td><b>57.00</b></td><td>76.16</td><td>57.12</td><td>43.70</td><td>30.00</td><td><b>76.96</b></td><td><b>47.16</b></td><td>56.84</td><td>2.00&times;</td></tr>
+              <tr class="ours-row"><td class="left">&nbsp;&nbsp;+ VLM-CFG (ours)</td><td><b>49.88</b></td><td>79.50</td><td>52.22</td><td>56.56</td><td><b>77.12</b></td><td>56.91</td><td>44.69</td><td>30.67</td><td>74.35</td><td>46.74</td><td><b>56.86</b></td><td>1.04&times;</td></tr>
+            </tbody>
+            <tbody id="tab-q3-8b" role="tabpanel" aria-label="Qwen3-VL-8B" hidden>
+              <tr class="base-row"><td class="left">Qwen3-VL-8B (unguided)</td><td><b>52.96</b></td><td>81.06</td><td>59.62</td><td>70.61</td><td>74.52</td><td>60.16</td><td>44.69</td><td>28.00</td><td>79.06</td><td>46.12</td><td>59.68</td><td>1.00&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ VCD</td><td>51.76</td><td>79.28</td><td>60.28</td><td>70.76</td><td>74.46</td><td>59.50</td><td>44.69</td><td>28.67</td><td><b>81.15</b></td><td>48.51</td><td>59.91</td><td>1.96&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ M3ID</td><td>52.68</td><td>81.09</td><td>59.63</td><td>70.49</td><td>74.65</td><td>60.20</td><td>45.68</td><td>26.67</td><td>78.53</td><td>46.22</td><td>59.58</td><td>1.08&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ PAI</td><td>51.72</td><td>79.71</td><td>62.09</td><td>71.08</td><td>76.22</td><td><b>61.97</b></td><td>44.44</td><td>30.00</td><td>79.58</td><td>47.37</td><td>60.42</td><td>2.05&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ SID</td><td>51.60</td><td>80.95</td><td>62.30</td><td><b>72.64</b></td><td>77.55</td><td>60.77</td><td><b>46.42</b></td><td>28.00</td><td>76.96</td><td>47.99</td><td>60.52</td><td>2.00&times;</td></tr>
+              <tr class="ours-row"><td class="left">&nbsp;&nbsp;+ VLM-CFG (ours)</td><td>52.36</td><td><b>81.13</b></td><td><b>63.80</b></td><td>72.43</td><td><b>79.01</b></td><td>61.16</td><td>45.19</td><td><b>30.67</b></td><td>79.58</td><td><b>48.62</b></td><td><b>61.40</b></td><td>1.04&times;</td></tr>
+            </tbody>
+            <tbody id="tab-ivl-8b" role="tabpanel" aria-label="InternVL3.5-8B" hidden>
+              <tr class="base-row"><td class="left">InternVL3.5-8B (unguided)</td><td>40.68</td><td>62.46</td><td>60.42</td><td>63.15</td><td>72.34</td><td>66.05</td><td>41.98</td><td><b>29.33</b></td><td>73.30</td><td>50.55</td><td>56.03</td><td>1.00&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ VCD</td><td>40.36</td><td>62.25</td><td>58.76</td><td>61.53</td><td>73.61</td><td>65.22</td><td>42.96</td><td><b>29.33</b></td><td>72.25</td><td>49.92</td><td>55.62</td><td>1.96&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ M3ID</td><td>40.20</td><td><b>62.55</b></td><td>60.10</td><td>62.53</td><td>72.34</td><td>66.05</td><td>41.98</td><td><b>29.33</b></td><td>73.30</td><td>50.55</td><td>55.89</td><td>1.08&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ PAI</td><td>41.60</td><td>62.27</td><td><b>62.35</b></td><td><b>65.08</b></td><td>73.52</td><td>66.22</td><td>41.23</td><td><b>29.33</b></td><td>73.30</td><td>50.55</td><td>56.54</td><td>2.05&times;</td></tr>
+              <tr><td class="left">&nbsp;&nbsp;+ SID</td><td>43.24</td><td>62.39</td><td>58.67</td><td>61.81</td><td>75.55</td><td>66.33</td><td><b>43.21</b></td><td><b>29.33</b></td><td><b>73.82</b></td><td><b>52.06</b></td><td><b>56.64</b></td><td>2.00&times;</td></tr>
+              <tr class="ours-row"><td class="left">&nbsp;&nbsp;+ VLM-CFG (ours)</td><td><b>45.40</b></td><td>62.45</td><td>58.36</td><td>61.37</td><td><b>76.68</b></td><td><b>67.05</b></td><td>41.73</td><td><b>29.33</b></td><td>68.59</td><td>50.03</td><td>56.10</td><td>1.04&times;</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callouts">
+          <p><strong>The strongest arm, at one scale everywhere.</strong> <span class="ours">VLM-CFG</span> gains 5.69 points
+            over the unguided Qwen2.5-VL-7B, against 3.44 for the best published method, and 1.72 on Qwen3-VL-8B, whose
+            unguided score of 59.68 already exceeds what any of the four baselines reaches on Qwen2.5-VL-7B. Qwen2.5-VL-3B
+            behaves like the 7B, at 3.42 points against 1.91.</p>
+          <p><strong>The baselines split in two.</strong> PAI and SID, which act on the conditional stream, gain on every
+            model. VCD loses on two models of five, as expected of the weakest point of the corruption cone. M3ID is below
+            the unguided model on all five, on Qwen2.5-VL-7B almost entirely through BLINK, where it collapses to 2.67
+            against 25.33.</p>
+        </div>
+        <p class="note">One model does not follow: on InternVL3.5-8B guidance is worth 0.07 points, and both PAI and SID edge
+          past it.</p>
+
+        <h3 class="sub" id="results-reasoning">Guidance versus reasoning</h3>
+        <p>
+          On PhD-CCS, the counter-common-sense split of the PhD hallucination benchmark, prompting the same models to
+          reason before answering is worth at most 0.72 points, while guidance adds 2.65 to 11.65.
+        </p>
+        <div class="table-wrap narrow">
+          <table class="results">
+            <caption>Accuracy (%) on PhD-CCS for the unguided model, the same model prompted to reason before it answers,
+              and <span class="ours">VLM-CFG</span>.</caption>
+            <thead><tr><th class="left"></th><th>Qwen2.5-VL-3B</th><th>Qwen2.5-VL-7B</th><th>Qwen3-VL-4B</th><th>InternVL3.5-8B</th></tr></thead>
+            <tbody>
+              <tr class="base-row"><td class="left">no guidance</td><td>73.09</td><td>67.50</td><td>74.47</td><td>72.34</td></tr>
+              <tr><td class="left">reasoning</td><td>73.81</td><td>68.20</td><td>74.73</td><td>72.10</td></tr>
+              <tr class="ours-row"><td class="left">VLM-CFG (ours)</td><td><b>77.12</b></td><td><b>79.15</b></td><td><b>77.12</b></td><td><b>76.68</b></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="sub" id="results-cost">The cheapest guided decoder</h3>
+        <p>
+          A guided decoder pays for its negative branch, and the four baselines do not pay alike. On the short answers of
+          this suite, prefill included, <span class="ours">VLM-CFG</span> costs 1.04&times; unguided decoding.
+        </p>
+        <div class="table-wrap narrow">
+          <table class="results">
+            <caption>What each decoder's negative branch costs, relative to unguided decoding on the short answers of the
+              ten-benchmark suite.</caption>
+            <thead><tr><th class="left">Method</th><th class="left">Why the negative branch costs what it does</th><th>Cost</th></tr></thead>
+            <tbody>
+              <tr><td class="left">VCD</td><td class="left">Re-encodes the image and carries every vision token</td><td>1.96&times;</td></tr>
+              <tr><td class="left">SID</td><td class="left">Re-encodes the image and carries every vision token</td><td>2.00&times;</td></tr>
+              <tr><td class="left">PAI</td><td class="left">Image-free, but its attention edit forces an eager kernel on the conditional stream</td><td>2.05&times;</td></tr>
+              <tr><td class="left">M3ID</td><td class="left">Deletes the image, read teacher-forced at every step</td><td>1.08&times;</td></tr>
+              <tr class="ours-row"><td class="left">VLM-CFG (ours)</td><td class="left">Deletes the image; one cached pass until the switch fires</td><td>1.04&times;</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Against M3ID the margin is four points of overhead, so we do not rest that comparison on cost. M3ID picks the
+          right negative branch but leaves the reference rule unstated, pairing it with a weight that grows without bound
+          in the token index, where our scale ladder finds no schedule that beats the best constant.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================== QUALITATIVE ==============================
+         Ready for the qualitative slides (Figures/CFG_Qualitative_fig_final.pptx).
+         Export each slide as static/images/qual_1.png ... qual_4.png, uncomment this
+         block, and add <li><a href="#qualitative">Qualitative Results</a></li> to the
+         table of contents above Limitations.
+    <section class="band" id="qualitative">
+      <div class="wrap">
+        <h2>Qualitative Results</h2>
+        <p>
+          Each example shows the conditional stream, the image-free stream and the guided prediction for the token that
+          decides the answer. Click any figure to enlarge it.
+        </p>
+        <div class="gallery">
+          <figure class="pop">
+            <img class="zoomable" src="static/images/qual_1.png" loading="lazy" alt="">
+            <figcaption></figcaption>
+          </figure>
+          <figure class="pop">
+            <img class="zoomable" src="static/images/qual_2.png" loading="lazy" alt="">
+            <figcaption></figcaption>
+          </figure>
+          <figure class="pop">
+            <img class="zoomable" src="static/images/qual_3.png" loading="lazy" alt="">
+            <figcaption></figcaption>
+          </figure>
+          <figure class="pop">
+            <img class="zoomable" src="static/images/qual_4.png" loading="lazy" alt="">
+            <figcaption></figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+    -->
+
+    <!-- ============================== LIMITATIONS ============================== -->
+    <section class="band" id="limitations">
+      <div class="wrap">
+        <h2>Limitations</h2>
+        <div class="cards three">
+          <div class="card">
+            <div class="card-kicker">Adaptive strength</div>
+            <h3>One scale leaves gains on the table</h3>
+            <p>The best scale differs from benchmark to benchmark, and picking it per benchmark beats our fixed choice.
+              Picking it per sample should do better still, but our best adaptive rule needs an oracle, and no feature
+              available at inference time reproduces it.</p>
+          </div>
+          <div class="card">
+            <div class="card-kicker">Localized-CFG</div>
+            <h3>Deleting only the region that matters</h3>
+            <p>Blacking out the annotated region beats deleting the whole image on two of the three benchmarks we tried,
+              and matches it on the third. That is an upper bound, not a method: when the model predicts the region
+              itself, the gain almost disappears.</p>
+          </div>
+          <div class="card">
+            <div class="card-kicker">Model coverage</div>
+            <h3>One model does not gain</h3>
+            <p>The same configuration transfers across two Qwen generations and four sizes, but on InternVL3.5-8B
+              guidance is worth 0.07 points, and PAI and SID edge past it.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== BIBTEX ============================== -->
+    <section class="band" id="bibtex">
+      <div class="wrap">
+        <h2>BibTeX</h2>
+        <div class="bib">
+          <button class="copy" type="button" id="copy-bib">Copy</button>
+<pre><code id="bib-text">@article{abdelrahman2026contrastive,
+  title   = {Contrastive Decoding Is Classifier-Free Guidance:
+             Unifying Visual Guidance for Vision-Language Models},
+  author  = {Abdelrahman, Eslam and Alkaf, Hamza Omar and Guerrero, Paul and
+             Ceylan, Duygu and Li, Yuheng and Iyer, Siddharth Srinivasan and
+             Zhao, Nanxuan and Shechtman, Eli and Singh, Krishna Kumar and
+             Elhoseiny, Mohamed},
+  journal = {arXiv preprint},
+  year    = {2026}
+}</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="wrap">
+        <p>&copy; 2026 the authors. <a href="#top">Back to top</a></p>
+      </div>
+    </footer>
+  </main>
+</div>
+
+<!-- Mobile table-of-contents toggle -->
+<button class="toc-toggle" id="toc-toggle" type="button" aria-controls="toc" aria-expanded="false">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  Contents
+</button>
+<div class="scrim" id="scrim" hidden></div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Enlarged figure">
+  <button class="lightbox-close" type="button" aria-label="Close">&times;</button>
+  <img alt="">
+</div>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+<script defer src="static/js/main.js"></script>
+</body>
+</html>
